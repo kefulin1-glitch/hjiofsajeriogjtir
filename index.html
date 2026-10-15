@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>星際特工：隕石躲避戰</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+            touch-action: none;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body class="w-screen h-screen flex flex-col items-center justify-center relative select-none">
+
+    <!-- 遊戲主畫布容器 -->
+    <div id="game-container" class="absolute inset-0 w-full h-full bg-slate-950">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- UI 介面層 -->
+    <div id="ui-layer" class="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
+        
+        <!-- 頂部計分板與狀態列 (遊戲中顯示) -->
+        <div id="hud" class="hidden flex justify-between items-center w-full max-w-4xl mx-auto bg-slate-900/80 backdrop-blur-md px-6 py-3 rounded-2xl border border-slate-700 shadow-2xl pointer-events-auto">
+            <div class="flex items-center space-x-6">
+                <div>
+                    <span class="text-xs text-slate-400 block">分數</span>
+                    <span id="score-display" class="text-2xl font-800 text-cyan-400">0</span>
+                </div>
+                <div>
+                    <span class="text-xs text-slate-400 block">等級</span>
+                    <span id="level-display" class="text-2xl font-800 text-yellow-400">1</span>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2">
+                <span class="text-xs text-slate-400 mr-2">生命</span>
+                <div id="lives-display" class="flex space-x-1">
+                    <!-- 動態生成生命愛心 -->
+                </div>
+            </div>
+        </div>
+
+        <!-- 畫面中央對話框 (開始畫面 / 結束畫面) -->
+        <div class="m-auto flex items-center justify-center w-full h-full">
+            
+            <!-- 開始畫面 -->
+            <div id="start-screen" class="pointer-events-auto bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center transform transition-all animate-fade-in">
+                <div class="inline-block p-4 bg-cyan-500/10 rounded-2xl mb-4 border border-cyan-500/20 text-cyan-400">
+                    <svg class="w-12 h-12 mx-auto animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                </div>
+                <h1 class="text-3xl font-extrabold text-white tracking-tight mb-2">星際特工</h1>
+                <p class="text-slate-400 text-sm mb-6">駕駛飛船閃避高速襲來的太空隕石！隨著時間等級提升，挑戰你的極限反應。</p>
+                
+                <div class="bg-slate-800/50 p-4 rounded-xl mb-6 text-left text-xs text-slate-300 space-y-2 border border-slate-700/50">
+                    <p class="font-semibold text-cyan-300">操作說明：</p>
+                    <p>• <b>電腦端：</b> 使用滑鼠游標拖曳或方向鍵移動飛船。</p>
+                    <p>• <b>行動端：</b> 觸碰螢幕並拖曳手指控制飛船移動。</p>
+                </div>
+
+                <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer">
+                    開始遊戲
+                </button>
+            </div>
+
+            <!-- 結束畫面 -->
+            <div id="game-over-screen" class="hidden pointer-events-auto bg-slate-900/90 backdrop-blur-xl border border-slate-700/80 p-8 md:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center transform transition-all">
+                <div class="inline-block p-4 bg-red-500/10 rounded-2xl mb-4 border border-red-500/20 text-red-400">
+                    <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                </div>
+                <h2 class="text-3xl font-extrabold text-white tracking-tight mb-1">任務失敗</h2>
+                <p class="text-slate-400 text-sm mb-6">飛船受到過度撞擊損毀！</p>
+                
+                <div class="bg-slate-800/50 p-5 rounded-2xl mb-6 space-y-3 border border-slate-700/50">
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">最終得分</span>
+                        <span id="final-score" class="text-2xl font-extrabold text-cyan-400">0</span>
+                    </div>
+                    <div class="flex justify-between items-center text-sm">
+                        <span class="text-slate-400">生存等級</span>
+                        <span id="final-level" class="text-xl font-bold text-yellow-400">1</span>
+                    </div>
+                </div>
+
+                <button onclick="startGame()" class="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold rounded-xl shadow-lg shadow-cyan-500/30 transition-all transform hover:-translate-y-0.5 active:translate-y-0 cursor-pointer">
+                    重新挑戰
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- 自訂通知對話框 (替代原生 alert) -->
+    <div id="msg-box" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div class="bg-slate-900 border border-slate-700 p-6 rounded-2xl max-w-xs w-full text-center shadow-2xl">
+            <p id="msg-text" class="text-sm text-slate-200 mb-4"></p>
+            <button onclick="closeMsgBox()" class="w-full py-2 bg-cyan-500 hover:bg-cyan-400 text-white font-bold rounded-xl transition-all cursor-pointer">確定</button>
+        </div>
+    </div>
+
+    <script>
+        // 取得畫布與繪圖環境
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 畫面尺寸設定
+        let width, height;
+        function resizeCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // 遊戲狀態變數
+        let gameState = 'START'; // 'START', 'PLAYING', 'GAMEOVER'
+        let score = 0;
+        let level = 1;
+        let lives = 3;
+        let frameCount = 0;
+        let spawnInterval = 60; // 生成隕石的頻率
+
+        // 遊戲物件
+        let player = {
+            x: width / 2,
+            y: height - 100,
+            radius: 20,
+            speed: 0.1, // 追隨滑鼠的緩動係數
+            targetX: width / 2,
+            targetY: height - 100
+        };
+
+        let asteroids = [];
+        let particles = [];
+        let stars = [];
+
+        // 初始化背景星星
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2 + 0.5,
+                    speed: Math.random() * 1.5 + 0.5
+                });
+            }
+        }
+        initStars();
+
+        // 替代 alert 函式
+        function showMsg(text) {
+            document.getElementById('msg-text').innerText = text;
+            document.getElementById('msg-box').classList.remove('hidden');
+        }
+        function closeMsgBox() {
+            document.getElementById('msg-box').classList.add('hidden');
+        }
+
+        // 綁定滑鼠與觸控事件
+        let isPointerDown = false;
+
+        window.addEventListener('pointerdown', (e) => {
+            if (gameState === 'PLAYING') {
+                isPointerDown = true;
+                updateTargetPosition(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (gameState === 'PLAYING' && isPointerDown) {
+                updateTargetPosition(e.clientX, e.clientY);
+            }
+        });
+
+        window.addEventListener('pointerup', () => {
+            isPointerDown = false;
+        });
+
+        function updateTargetPosition(clientX, clientY) {
+            player.targetX = clientX;
+            player.targetY = clientY;
+        }
+
+        // 鍵盤控制支援
+        let keys = {};
+        window.addEventListener('keydown', (e) => { keys[e.key] = true; });
+        window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+        function handleKeyboardInput() {
+            if (gameState !== 'PLAYING') return;
+            let moveSpeed = 8;
+            if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.targetX -= moveSpeed;
+            if (keys['ArrowRight'] || keys['d'] || keys['D']) player.targetX += moveSpeed;
+            if (keys['ArrowUp'] || keys['w'] || keys['W']) player.targetY -= moveSpeed;
+            if (keys['ArrowDown'] || keys['s'] || keys['S']) player.targetY += moveSpeed;
+
+            // 限制目標範圍在視窗內
+            player.targetX = Math.max(player.radius, Math.min(width - player.radius, player.targetX));
+            player.targetY = Math.max(player.radius, Math.min(height - player.radius, player.targetY));
+        }
+
+        // 更新生命愛心 UI
+        function updateLivesUI() {
+            const container = document.getElementById('lives-display');
+            container.innerHTML = '';
+            for (let i = 0; i < 3; i++) {
+                const heart = document.createElement('span');
+                heart.innerHTML = i < lives ? '❤️' : '🖤';
+                heart.className = 'text-sm transition-all duration-300';
+                container.appendChild(heart);
+            }
+        }
+
+        // 開始遊戲
+        function startGame() {
+            gameState = 'PLAYING';
+            score = 0;
+            level = 1;
+            lives = 3;
+            frameCount = 0;
+            spawnInterval = 60;
+            asteroids = [];
+            particles = [];
+
+            player.x = width / 2;
+            player.y = height - 100;
+            player.targetX = player.x;
+            player.targetY = player.y;
+
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-over-screen').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+
+            updateLivesUI();
+        }
+
+        // 遊戲結束
+        function gameOver() {
+            gameState = 'GAMEOVER';
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('final-score').innerText = Math.floor(score);
+            document.getElementById('final-level').innerText = level;
+            document.getElementById('game-over-screen').classList.remove('hidden');
+        }
+
+        // 產生爆炸粒子特效
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 20; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    radius: Math.random() * 3 + 1,
+                    color: color,
+                    alpha: 1,
+                    decay: Math.random() * 0.03 + 0.01
+                });
+            }
+        }
+
+        // 產生隕石
+        function spawnAsteroid() {
+            const radius = Math.random() * 25 + 15;
+            const x = Math.random() * (width - radius * 2) + radius;
+            const y = -50;
+            const speed = (Math.random() * 2 + 2) + (level * 0.5);
+            
+            // 隨機產生隕石形狀頂點，讓外觀更豐富
+            let vertices = [];
+            let vertexCount = Math.floor(Math.random() * 4) + 6;
+            for (let i = 0; i < vertexCount; i++) {
+                let angle = (i / vertexCount) * Math.PI * 2;
+                let r = radius * (0.8 + Math.random() * 0.4);
+                vertices.push({ x: Math.cos(angle) * r, y: Math.sin(angle) * r });
+            }
+
+            asteroids.push({
+                x: x,
+                y: y,
+                radius: radius,
+                speed: speed,
+                rotation: Math.random() * Math.PI,
+                rotSpeed: (Math.random() - 0.5) * 0.05,
+                vertices: vertices
+            });
+        }
+
+        // 主遊戲迴圈更新
+        function update() {
+            if (gameState !== 'PLAYING') return;
+
+            frameCount++;
+            score += 0.1;
+
+            // 等級提升機制（每 300 分升一級）
+            level = Math.floor(score / 30) + 1;
+            spawnInterval = Math.max(20, 60 - (level * 4));
+
+            // 更新介面數值
+            document.getElementById('score-display').innerText = Math.floor(score);
+            document.getElementById('level-display').innerText = level;
+
+            // 處理鍵盤移動
+            handleKeyboardInput();
+
+            // 飛船平滑跟隨目標位置 (Lerp)
+            player.x += (player.targetX - player.x) * player.speed;
+            player.y += (player.targetY - player.y) * player.speed;
+
+            // 限制飛船在視窗範圍內
+            player.x = Math.max(player.radius, Math.min(width - player.radius, player.x));
+            player.y = Math.max(player.radius, Math.min(height - player.radius, player.y));
+
+            // 背景星星更新
+            stars.forEach(star => {
+                star.y += star.speed + (level * 0.2);
+                if (star.y > height) {
+                    star.y = 0;
+                    star.x = Math.random() * width;
+                }
+            });
+
+            // 生成隕石
+            if (frameCount % spawnInterval === 0) {
+                spawnAsteroid();
+            }
+
+            // 更新隕石位置與碰撞檢測
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                let ast = asteroids[i];
+                ast.y += ast.speed;
+                ast.rotation += ast.rotSpeed;
+
+                // 碰撞檢測 (圓形碰撞)
+                let dx = player.x - ast.x;
+                let dy = player.y - ast.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < player.radius + ast.radius - 5) {
+                    // 發生碰撞
+                    createExplosion(player.x, player.y, '#ef4444');
+                    asteroids.splice(i, 1);
+                    lives--;
+                    updateLivesUI();
+
+                    if (lives <= 0) {
+                        gameOver();
+                    }
+                    continue;
+                }
+
+                // 移除超出畫面的隕石
+                if (ast.y - ast.radius > height) {
+                    asteroids.splice(i, 1);
+                }
+            }
+
+            // 更新粒子特效
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= p.decay;
+                if (p.alpha <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // 畫面繪製
+        function draw() {
+            // 清空畫布
+            ctx.fillStyle = '#020617';
+            ctx.fillRect(0, 0, width, height);
+
+            // 繪製背景星星
+            ctx.fillStyle = '#ffffff';
+            stars.forEach(star => {
+                ctx.globalAlpha = Math.random() * 0.5 + 0.5;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            // 繪製隕石
+            asteroids.forEach(ast => {
+                ctx.save();
+                ctx.translate(ast.x, ast.y);
+                ctx.rotate(ast.rotation);
+                ctx.strokeStyle = '#64748b';
+                ctx.fillStyle = '#334155';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ast.vertices.forEach((v, index) => {
+                    if (index === 0) ctx.moveTo(v.x, v.y);
+                    else ctx.lineTo(v.x, v.y);
+                });
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+                ctx.restore();
+            });
+
+            // 繪製粒子特效
+            particles.forEach(p => {
+                ctx.save();
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+            });
+
+            // 繪製玩家飛船 (精美太空戰機造型)
+            if (gameState === 'PLAYING') {
+                ctx.save();
+                ctx.translate(player.x, player.y);
+
+                // 推進器火焰特效
+                ctx.fillStyle = '#38bdf8';
+                ctx.beginPath();
+                ctx.moveTo(-6, player.radius);
+                ctx.lineTo(0, player.radius + 12 + Math.random() * 6);
+                ctx.lineTo(6, player.radius);
+                ctx.closePath();
+                ctx.fill();
+
+                // 飛船本體主色
+                ctx.fillStyle = '#0ea5e9';
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                ctx.moveTo(0, -player.radius * 1.2); // 機頭
+                ctx.lineTo(player.radius, player.radius); // 右翼
+                ctx.lineTo(0, player.radius * 0.6); // 機尾凹陷
+                ctx.lineTo(-player.radius, player.radius); // 左翼
+                ctx.closePath();
+                ctx.fill();
+                ctx.stroke();
+
+                // 飛船駕駛艙蓋
+                ctx.fillStyle = '#e0f2fe';
+                ctx.beginPath();
+                ctx.ellipse(0, -2, 4, 8, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            }
+        }
+
+        // 主遊戲迴圈
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // 啟動迴圈
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
